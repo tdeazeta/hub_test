@@ -1,1 +1,2 @@
 Hi rebase me
+test for conflict
