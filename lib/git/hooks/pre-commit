@@ -1,0 +1,91 @@
+#!/usr/bin/env ruby
+#
+
+begin
+  require 'yaml'
+  require 'rubygems'
+  require 'rainbow'
+rescue LoadError
+  # Do Nothing
+end
+
+$settings = YAML.load(File.read(
+  File.join('lib', 'git', 'hooks', 'forbidden_code.yml')))['forbidden_code']
+
+module Code; end
+class << Code
+  def lgrep(text, regex)
+    text.lines.with_index.inject([]) do |matches, element|
+      element[1] = element[1] + 1
+      begin
+        matches << element if(element[0][regex])
+      rescue => error
+        element[0] = "#{element[0].strip!} #{"# #{error.to_s}".color(:red)}"
+        matches << element
+      end
+      matches
+    end
+  end
+
+  class_eval <<-CODE
+    def find_errors(path)
+      text = File.read(path)
+      file_errors = Hash.new
+
+      case path
+      #{
+      conditions = $settings.map do |file_extension, matchers| %Q|
+      when /\\.#{file_extension}/
+        #{
+        lgreps = matchers.map do |label, regex| %Q!
+          #{label}_matches = lgrep(text, /#{regex}/)
+        !end
+        lgreps.join
+        }
+
+        return file_errors if #{
+          empty_checks = matchers.map do |label, regex| %Q!
+            #{label}_matches.empty?
+          !end
+          empty_checks.join('&&').gsub(/\n/, '')
+        }
+
+        #{
+        errors = matchers.map do |label, regex| %Q!
+          file_errors['#{label}'] = #{label}_matches unless #{label}_matches.empty?
+        !end
+        errors.join
+        }
+
+      |end
+      conditions.join}
+      end
+
+      file_errors
+    end
+  CODE
+end
+
+
+changed_files = `git diff-index --name-status HEAD -- | cut -c3-`.split
+errors = Hash.new
+
+changed_files.each do |path|
+  next if !File.exists?(path) or File.directory?(path)
+  file_errors = Code.find_errors(path)
+  errors[path] = file_errors unless file_errors.empty?
+end
+
+unless errors.empty?
+  errors.each do |file, errors|
+    puts "\n#{file.color(:green)}"
+    errors.each do |type, errors|
+      puts "  `#{type.color(:red)}` code exists!"
+      errors.each do |error|
+        puts "#{error[1].to_s.color(:yellow)} #{error[0]}"
+      end
+    end
+  end
+
+  abort "\nPlease resolve code errors above to be able to commit."
+end

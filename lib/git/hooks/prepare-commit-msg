@@ -1,0 +1,22 @@
+#!/bin/sh
+ORIG_MSG_FILE="$1"
+
+if [ -z `git config --local --get commit.template` ]
+then
+  TEMP=`mktemp /tmp/git-XXXXX`
+  TICKETNO=`git branch | grep '^\*' | cut -b3-`
+  COMMIT=${TICKETNO/\//|}
+  NAME=`git config --get user.name`
+  EMAIL=`git config --get user.email`
+  DETAILS=`cat $ORIG_MSG_FILE | grep '^#'`
+
+  if [ -z "$DETAILS" ]
+  then
+    MSG=`cat "$ORIG_MSG_FILE"`
+  else
+    MSG=""
+  fi
+
+  (echo "[$COMMIT] $MSG\n\nSigned-off-by: $NAME <$EMAIL>\n"; cat "$ORIG_MSG_FILE" | grep '^#') > "$TEMP"
+  cat "$TEMP" > "$ORIG_MSG_FILE"
+fi

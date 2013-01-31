@@ -1,0 +1,14 @@
+# Sample format
+# file_type:
+#   label: regex
+#   label2: regex2
+#
+
+forbidden_code:
+  rb:
+    debugger: debugger
+    pry: binding\.pry
+  js:
+    console: console\.(log|info|error)
+    debugger: debugger
+#   synchronous_code: async:\s?false
